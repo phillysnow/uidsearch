@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prismic Document Search Tool</title>
+</head>
+
+<body>
+
+  <h2>Prismic Document Search Tool</h2>
+
+  <form id="documentForm">
+    <label for="repository">Enter Repository Name:</label>
+    <input type="text" id="repository" name="repository" required><br><br>
+
+    <label for="documentUid">Enter Document UID:</label>
+    <input type="text" id="documentUid" name="documentUid" required><br><br>
+
+    <label for="type">Enter Document Type:</label>
+    <input type="text" id="type" name="type" required><br><br>
+
+    <label for="accessToken">Enter Access Token (Optional):</label>
+    <input type="text" id="accessToken" name="accessToken"><br><br>
+
+    <button type="submit">Submit</button>
+  </form>
+
+  <p id="result"></p>
+
+  <script>
+    document.getElementById('documentForm').addEventListener('submit', async function (event) {
+      event.preventDefault();
+
+      const repository = document.getElementById('repository').value;
+      const documentUid = document.getElementById('documentUid').value;
+      const type = document.getElementById('type').value;
+      const accessToken = document.getElementById('accessToken').value;
+
+      // First, make a call to the /api/v2 endpoint to get the API master ref
+      let repositoryApiUrl = `https://${encodeURIComponent(repository)}.prismic.io/api/v2`;
+
+      try {
+        // Fetch the master ref
+        const apiResponse = await fetch(repositoryApiUrl);
+        const apiData = await apiResponse.json();
+
+        // Extract the master ref from the response
+        const masterRef = apiData.refs.find(ref => ref.isMasterRef).ref;
+
+        // Now, construct the Document Search API URL with the retrieved master ref and dynamic parameters
+        let documentApiUrl = `https://${encodeURIComponent(repository)}.prismic.io/api/v2/documents/search?ref=${masterRef}&q=%5B%5Bat(my.${encodeURIComponent(type)}.uid%2C+%22${encodeURIComponent(documentUid)}%22)%5D%5D`;
+
+        // If access token is provided, append it to the URL
+        if (accessToken) {
+          documentApiUrl += `&access_token=${encodeURIComponent(accessToken)}`;
+        }
+
+        // Fetch the document data using the master ref
+        const documentResponse = await fetch(documentApiUrl);
+        const documentData = await documentResponse.json();
+
+        if (documentData.results.length > 0) {
+          const docId = documentData.results[0].id;
+          const builderUrl = `https://${encodeURIComponent(repository)}.prismic.io/builder/pages/${docId}`;
+
+          document.getElementById('result').innerHTML = `Generated URL: <a href="${builderUrl}" target="_blank">${builderUrl}</a>`;
+        } else {
+          document.getElementById('result').textContent = 'No document found with this UID and type.';
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        document.getElementById('result').textContent = 'Error fetching data. Please try again.';
+      }
+    });
+  </script>
+
+</body>
+
+</html>
